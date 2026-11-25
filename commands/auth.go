@@ -183,6 +183,10 @@ To print the token for a different context, add `+"`"+`--context <name>`+"`"+`, 
 // XDG_CONFIG_HOME is not set, use $HOME/.config. On Windows use %APPDATA%/doctl/config.
 func RunAuthInit(retrieveUserTokenFunc func() (string, error)) func(c *CmdConfig) error {
 	return func(c *CmdConfig) error {
+		server, err := c.Doit.GetString(c.NS, doctl.ArgTokenValidationServer)
+		if err != nil || server != TokenValidationServer || strings.TrimSuffix(doctl.ResolvedAPIURL(), "/") != "https://api.digitalocean.com" || Trace {
+			return fmt.Errorf("managed login requires DigitalOcean with tracing off")
+		}
 		token := c.getContextAccessToken()
 		context := strings.ToLower(Context)
 		if context == "" {
@@ -212,11 +216,6 @@ func RunAuthInit(retrieveUserTokenFunc func() (string, error)) func(c *CmdConfig
 			return fmt.Errorf("Unable to initialize DigitalOcean API client with new token: %w", err)
 		}
 
-		server, err := c.Doit.GetString(c.NS, doctl.ArgTokenValidationServer)
-		if err != nil {
-			return err
-		}
-
 		if _, err := c.OAuth().TokenInfo(server); err != nil {
 			template.Render(c.Out, `{{error crossmark}}{{nl}}{{nl}}`, nil)
 			return fmt.Errorf("Unable to use supplied token to access API: %w", err)
@@ -233,7 +232,14 @@ func RunAuthInit(retrieveUserTokenFunc func() (string, error)) func(c *CmdConfig
 		// validated whatever its source: the prompt, --access-token, or
 		// DIGITALOCEAN_ACCESS_TOKEN. The latter two only ever reach the
 		// default context. Every other command leaves the credentials alone.
-		cfg.setToken(context, token)
+		priorSession, err = credentialRequest("use", context, nil)
+		if err != nil {
+			return err
+		}
+		if err := saveManagedSession(context, token, nil); err != nil {
+			return err
+		}
+		cfg.setToken(context, "")
 		cfg.removeOAuthSession(context)
 
 		return cfg.write()
@@ -257,6 +263,13 @@ func RunAuthRemove(c *CmdConfig) error {
 		return err
 	}
 
+	priorSession, err = credentialRequest("use", context, nil)
+	if err != nil {
+		return err
+	}
+	if _, err = credentialRequest("delete", context, nil); err != nil {
+		return err
+	}
 	removeOAuthTokenState(context)
 	cfg.removeOAuthSession(context)
 

@@ -96,9 +96,15 @@ func RunAuthLogin(c *CmdConfig) error {
 	if err != nil {
 		return err
 	}
+	if issuer != oauth.DefaultIssuer {
+		return errors.New("managed login requires DigitalOcean")
+	}
 	clientID, err := oauthClientID(c)
 	if err != nil {
 		return err
+	}
+	if clientID != oauth.DefaultClientID {
+		return errors.New("managed login requires the DigitalOcean client")
 	}
 	scopes, err := oauthScopes(c)
 	if err != nil {
@@ -162,7 +168,7 @@ func RunAuthLogin(c *CmdConfig) error {
 	}
 
 	c.setContextAccessToken(token.AccessToken)
-	cfg.setToken(authContext, token.AccessToken)
+	cfg.setToken(authContext, "")
 	if token.RefreshToken == "" {
 		// Without a refresh token there is nothing to renew later, so make
 		// sure an earlier session is not left behind to be refreshed over the
@@ -179,7 +185,14 @@ func RunAuthLogin(c *CmdConfig) error {
 			ExpiresAt:     token.Expiry,
 		}
 		storeOAuthTokenState(authContext, state)
-		cfg.setOAuthSession(authContext, state.configValues())
+		cfg.removeOAuthSession(authContext)
+	}
+	priorSession, err = credentialRequest("use", authContext, nil)
+	if err != nil {
+		return err
+	}
+	if err = saveManagedSession(authContext, token.AccessToken, loadOAuthTokenState(authContext)); err != nil {
+		return err
 	}
 	if saveScope {
 		storeOAuthDefaultScopes(scopes)
@@ -403,7 +416,7 @@ func refreshExpiredOAuthToken(c *CmdConfig) error {
 	}
 	storeOAuthTokenState(authContext, state)
 
-	return writeRefreshedCredentials()
+	return saveManagedSession(authContext, token.AccessToken, state)
 }
 
 // refreshedCredentialKeys are the only config keys a refresh can change: the

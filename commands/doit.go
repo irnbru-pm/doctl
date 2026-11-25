@@ -142,6 +142,9 @@ func initConfig() {
 	viper.SetConfigType("yaml")
 
 	cfgFile := viper.GetString("config")
+	if cfgFile != "" && cfgFile != filepath.Join(defaultConfigHome(), defaultConfigName) {
+		checkErr(fmt.Errorf("custom doctl config cannot supply a managed session"))
+	}
 	if cfgFile == "" {
 		cfgFile = filepath.Join(defaultConfigHome(), defaultConfigName)
 		viper.Set("config", cfgFile)
@@ -153,6 +156,18 @@ func initConfig() {
 	Context = strings.ToLower(Context)
 
 	if _, err := os.Stat(cfgFile); err == nil {
+		cfg, err := loadConfigFile()
+		checkErr(err)
+		for k, v := range cfg.doc {
+			if strings.EqualFold(k, oauthTokensConfigKey) || strings.EqualFold(k, doctl.ArgAccessToken) && v != "" && v != nil {
+				checkErr(fmt.Errorf("managed doctl config contains credentials; use doctl auth login"))
+			}
+		}
+		for _, v := range cfg.contexts() {
+			if v != "" {
+				checkErr(fmt.Errorf("managed doctl contexts must contain names only"))
+			}
+		}
 		if err := viper.ReadInConfig(); err != nil {
 			checkErr(fmt.Errorf("config initialization failed: %w", err))
 		}
@@ -164,7 +179,7 @@ var defaultConfigHome = func() string {
 	cfgDir, err := os.UserConfigDir()
 	checkErr(err)
 
-	return filepath.Join(cfgDir, "doctl")
+	return filepath.Join(cfgDir, "IrnBru", "doctl")
 }
 
 func configHome() string {

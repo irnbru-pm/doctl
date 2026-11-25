@@ -174,6 +174,9 @@ func cmdBuilderWithInit(parent *Command, cr CmdRunner, cliText, shortdesc string
 		// Recorded so checkErr can suggest `<command> --help` as the default
 		// next step without threading cmd through every call site.
 		activeCommand = cmd
+		if initCmd && !accessTokenOverridden() || cmd.CommandPath() == "doctl auth token" && !accessTokenOverridden() {
+			checkErr(loadManagedSession(currentAuthContext()))
+		}
 
 		cfg, err := NewCmdConfig(
 			cmdNS(c),
