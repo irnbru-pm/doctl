@@ -46,6 +46,6 @@ with tempfile.TemporaryDirectory(dir=output.parent) as temp:
     sign(worker, 'dev.mxcl.irnbru.' + tool + '.worker')
     sign(bundle)
     run('codesign','--verify','--deep','--strict',bundle)
-    run(sys.executable, src / 'test_dispatch.py', worker)
+    run(sys.executable, src / 'test_dispatch.py', worker, '.'.join((major, minor, patch)))
     run('tar','czf',stage/'artifact.tgz','-C',stage,bundle.name,env=dict(os.environ,COPYFILE_DISABLE='1'))
     (stage/'artifact.tgz').replace(output)

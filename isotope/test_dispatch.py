@@ -51,7 +51,7 @@ def check(worker, args, requests, success, expected):
         print(worker.parent.parent.parent.name, *args, 'OK', flush=True)
 
 
-check(doctl, ['version'], [], True, '2.8.0')
+check(doctl, ['version'], [], True, sys.argv[2])
 check(doctl, ['auth', 'token', '--context', 'work'], [('use', 'work', dict(ok=True, value=session))], True, token)
 check(doctl, ['account', 'get'], [('use', 'default', deny)], False, 'fixture approval denied')
 check(doctl, ['auth', 'remove', '--context', 'default'],
